@@ -1,0 +1,25 @@
+<!-- file_search.html -->
+
+{% extends 'base.html' %} {% block content %}
+<h1>File Search</h1>
+<form
+	method="post"
+	action="{% url 'file_search' %}">
+	{% csrf_token %}
+	<input
+		type="text"
+		name="keyword"
+		placeholder="Enter keyword" />
+	<button type="submit">Search</button>
+</form>
+<br />
+{% if files %}
+<ul>
+	{% for file in files %}
+	<p>{{ file.name }}</p>
+	<a href="{% url 'download_file' file.id %}">Download</a>
+	{% endfor %}
+</ul>
+{% else %}
+<p>No files found.</p>
+{% endif %} {% endblock %}
