@@ -55,38 +55,3 @@ def decrypt_file(encrypted_file_content_b64, encrypted_symmetric_key_b64, privat
     except Exception as e:
         print(f"Decryption error: {e}")
         raise
-
-
-
-def checkCode(file):
-    try:
-        # Generate key pair
-        private_key, public_key = generate_key_pair()
-
-        # Encrypt file
-        file_content = file
-        encrypted_file_content_b64, encrypted_symmetric_key_b64 = encrypt_file(
-            file_content, public_key
-        )
-
-        # Decrypt file
-        decrypted_file_content = decrypt_file(
-            encrypted_file_content_b64, encrypted_symmetric_key_b64, private_key
-        )
-
-        # Check if decryption is successful and the decrypted content matches the original file content
-        print(decrypted_file_content == file)
-        if decrypted_file_content == file:
-            # Create a temporary file to save the decrypted content
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                temp_file.write(decrypted_file_content)
-                temp_file_path = temp_file.name
-
-            # Return the path to the temporary file
-            return temp_file_path
-        else:
-            print("Decryption failed or decrypted content doesn't match the original file.")
-            return None
-    except Exception as e:
-        print(f"Error: {e}")
-        return None

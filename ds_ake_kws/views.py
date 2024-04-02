@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from .forms import FileUploadForm
-from .encryption import encrypt_file, decrypt_file, generate_key_pair, checkCode
+from .encryption import encrypt_file, decrypt_file, generate_key_pair
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, logout
@@ -10,13 +10,18 @@ import secrets
 from django.contrib import messages
 from django.db.models import Q
 import logging
-from django.http import HttpResponseServerError, HttpResponse, HttpResponseNotFound, FileResponse
-from mimetypes import guess_type
+from django.http import (
+    HttpResponseServerError,
+    HttpResponse,
+    HttpResponseNotFound,
+    FileResponse,
+)
 import io
 
-logger = logging.getLogger(__name__)
+import os
+from django.conf import settings
 
-orgFile = ""
+logger = logging.getLogger(__name__)
 
 
 def dashboard(request):
@@ -48,27 +53,22 @@ def upload_file(request):
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # file_content = b""
-                # for chunk in request.FILES["file"].chunks():
-                #     file_content += chunk
-                global orgFile
-                orgFile = request.FILES["file"].read()
+                uploaded_file = request.FILES["file"]
+                original_file_content = uploaded_file.read()
+
                 private_key, public_key = generate_key_pair()
                 encrypted_file_content, encrypted_symmetric_key = encrypt_file(
-                    request.FILES["file"].read(), public_key
+                    original_file_content, public_key
                 )
 
-                # checkCode(request.FILES["file"].read())
                 encrypted_file = EncryptedFile(
                     owner=request.user,
                     encrypted_content=encrypted_file_content,
                     encrypted_symmetric_key=encrypted_symmetric_key,
-                    name=request.FILES["file"].name,
+                    name=uploaded_file.name,
                     private_key=private_key,
-                    content=request.FILES["file"].read(),
-                )
-                decrypted_file_content = decrypt_file(
-                    encrypted_file_content, encrypted_symmetric_key, private_key
+                    content=original_file_content,
+                    file=uploaded_file,
                 )
 
                 encrypted_file.save()
@@ -95,37 +95,15 @@ def upload_file(request):
 
 
 def download_file(request, file_id):
-    try:
-        # Retrieve encrypted file object
-        encrypted_file = EncryptedFile.objects.get(id=file_id)
-
-        # Decrypt file content
-        decrypted_content = decrypt_file(
-            encrypted_file.encrypted_content,
-            encrypted_file.encrypted_symmetric_key,
-            encrypted_file.private_key,
-        )
-        # Determine MIME type
-        file_obj = io.BytesIO(decrypted_content)
-
-        print("orgFile.........", encrypted_file.content == decrypted_content,file_obj)
-        mime_type, _ = guess_type(encrypted_file.name)
-        if not mime_type:
-            mime_type = "application/octet-stream"
-
-        # Set up response
-        response = FileResponse(file_obj, content_type=mime_type)
-        response["Content-Disposition"] = (
-            f'attachment; filename="{encrypted_file.name}"'
-        )
-
-        return response
-
-    except EncryptedFile.DoesNotExist:
-        return HttpResponseNotFound("File not found")
-
-    except Exception as e:
-        return HttpResponseServerError(f"An error occurred: {str(e)}")
+    encrypted_file = EncryptedFile.objects.get(id=file_id)
+    decrypt_file(
+        encrypted_file.encrypted_content,
+        encrypted_file.encrypted_symmetric_key,
+        encrypted_file.private_key,
+    )
+    response = HttpResponse(encrypted_file.file, content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="{encrypted_file.name}"'
+    return response
 
 
 def file_search(request):
